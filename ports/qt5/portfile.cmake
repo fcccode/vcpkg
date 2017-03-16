@@ -25,6 +25,16 @@ if (EXISTS ${CURRENT_BUILDTREES_DIR}/src/qt-everywhere-opensource-src-5.7.1)
     file(RENAME ${CURRENT_BUILDTREES_DIR}/src/qt-everywhere-opensource-src-5.7.1 ${CURRENT_BUILDTREES_DIR}/src/qt-5.7.1)
 endif()
 
+# Copy (symlink)
+# Release:
+# - jpeg.lib -> libjpeg.lib
+# - libpng16.lib -> libpng.lib
+# - zlib.lib -> zdll.lib
+# Debug:
+# - jpeg.lib -> libjpeg.lib
+# - libpng16d.lib -> libpngd.lib
+# - zlibd.lib -> zdlld.lib
+
 if(EXISTS ${OUTPUT_PATH})
     file(REMOVE_RECURSE ${OUTPUT_PATH})
     if(EXISTS ${OUTPUT_PATH})
@@ -53,20 +63,18 @@ vcpkg_execute_required_process(
     COMMAND "${SOURCE_PATH}/configure.bat"
         -confirm-license -opensource -platform win32-msvc2015
         -debug-and-release -force-debug-info ${QT_RUNTIME_LINKAGE}
-        -qt-zlib
-        -no-libjpeg
-        -no-libpng
+        -system-zlib
+        -system-libjpeg
+        -system-libpng
         -no-freetype
-        -qt-pcre
+        -system-pcre
         -no-harfbuzz
-        -no-angle
         -no-inotify
         -no-mtdev
         -no-evdev
         -system-doubleconversion
         -no-iconv
         -system-sqlite
-        -no-opengl
         -no-style-windowsxp
         -no-style-windowsvista
         -no-style-fusion
