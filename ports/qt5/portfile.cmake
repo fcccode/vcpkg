@@ -1,6 +1,6 @@
 include(${CMAKE_TRIPLET_FILE})
 include(vcpkg_common_functions)
-set(SOURCE_PATH ${CURRENT_BUILDTREES_DIR}/src/qt-5.7.1)
+set(SOURCE_PATH ${CURRENT_BUILDTREES_DIR}/src/qt-5.8.0)
 set(OUTPUT_PATH ${CURRENT_BUILDTREES_DIR}/${TARGET_TRIPLET})
 set(ENV{QTDIR} ${OUTPUT_PATH}/qtbase)
 set(ENV{PATH} "${OUTPUT_PATH}/qtbase/bin;$ENV{PATH}")
@@ -16,13 +16,13 @@ set(ENV{PATH} "${JOM_EXE_PATH};${PYTHON3_EXE_PATH};${CURRENT_INSTALLED_DIR}/bin;
 set(ENV{INCLUDE} "${CURRENT_INSTALLED_DIR}/include;$ENV{INCLUDE}")
 set(ENV{LIB} "${CURRENT_INSTALLED_DIR}/lib;$ENV{LIB}")
 vcpkg_download_distfile(ARCHIVE_FILE
-    URLS "http://download.qt.io/official_releases/qt/5.7/5.7.1/single/qt-everywhere-opensource-src-5.7.1.7z"
-    FILENAME "qt-5.7.1.7z"
-    SHA512 3ffcf490a1c0107a05113aebbf70015c50d05fbb35439273c243133ddb146d51aacae15ecd6411d563cc8cfe103df896394c365a69bc48fc86c3bce6a1af3107
+    URLS "http://download.qt.io/official_releases/qt/5.8/5.8.0/single/qt-everywhere-opensource-src-5.8.0.7z"
+    FILENAME "qt-5.8.0.7z"
+    SHA512 4c8e7931f0c48318871242c12c2d6f5406be40e037f18690017198a79ef40a72d4319ecb1b8fb5f97c080dbe30174ceb5fd604b3fab22489f977cbeee3e8abe7
 )
 vcpkg_extract_source_archive(${ARCHIVE_FILE})
-if (EXISTS ${CURRENT_BUILDTREES_DIR}/src/qt-everywhere-opensource-src-5.7.1)
-    file(RENAME ${CURRENT_BUILDTREES_DIR}/src/qt-everywhere-opensource-src-5.7.1 ${CURRENT_BUILDTREES_DIR}/src/qt-5.7.1)
+if (EXISTS ${CURRENT_BUILDTREES_DIR}/src/qt-everywhere-opensource-src-5.8.0)
+    file(RENAME ${CURRENT_BUILDTREES_DIR}/src/qt-everywhere-opensource-src-5.8.0 ${CURRENT_BUILDTREES_DIR}/src/qt-5.8.0)
 endif()
 
 if(EXISTS ${OUTPUT_PATH})
@@ -32,6 +32,12 @@ if(EXISTS ${OUTPUT_PATH})
     endif()
 endif()
 file(MAKE_DIRECTORY ${OUTPUT_PATH})
+
+vcpkg_apply_patches(
+	SOURCE_PATH ${SOURCE_PATH}
+	PATCHES "${CMAKE_CURRENT_LIST_DIR}/qalgorithms.patch" "${CMAKE_CURRENT_LIST_DIR}/configure.json.patch"
+	)
+
 if(DEFINED VCPKG_CRT_LINKAGE AND VCPKG_CRT_LINKAGE STREQUAL static)
     list(APPEND QT_RUNTIME_LINKAGE "-static")
     list(APPEND QT_RUNTIME_LINKAGE "-static-runtime")
@@ -45,35 +51,32 @@ else()
         SOURCE_PATH ${SOURCE_PATH}
         PATCHES "${CMAKE_CURRENT_LIST_DIR}/set-shared-qmakespec.patch"
         QUIET
-    )
+	)
 endif()
 
 message(STATUS "Configuring ${TARGET_TRIPLET}")
 vcpkg_execute_required_process(
     COMMAND "${SOURCE_PATH}/configure.bat"
-        -confirm-license -opensource -platform win32-msvc2015
+        -confirm-license -opensource -platform win32-msvc2017
         -debug-and-release -force-debug-info ${QT_RUNTIME_LINKAGE}
-        -qt-zlib
-        -no-libjpeg
-        -no-libpng
+        -system-zlib
+        -system-libjpeg
+        -system-libpng
         -no-freetype
-        -qt-pcre
+        -system-pcre
         -no-harfbuzz
-        -no-angle
         -no-inotify
         -no-mtdev
         -no-evdev
         -system-doubleconversion
         -no-iconv
         -system-sqlite
-        -no-opengl
         -no-style-windowsxp
         -no-style-windowsvista
         -no-style-fusion
         -mp
         -nomake examples -nomake tests -no-compile-examples
-        -skip webengine -skip declarative
-        -qt-sql-sqlite -qt-sql-psql
+        -skip webengine
         -prefix ${CURRENT_PACKAGES_DIR}
         -bindir ${CURRENT_PACKAGES_DIR}/bin
         -hostbindir ${CURRENT_PACKAGES_DIR}/tools/qt5
@@ -127,9 +130,6 @@ if(DEFINED VCPKG_CRT_LINKAGE AND VCPKG_CRT_LINKAGE STREQUAL dynamic)
     file(REMOVE ${DEBUG_BIN_FILES})
     file(GLOB DEBUG_BIN_FILES "${CURRENT_PACKAGES_DIR}/bin/*d.pdb")
     file(REMOVE ${DEBUG_BIN_FILES})
-    if(EXISTS ${CURRENT_PACKAGES_DIR}/debug/bin/Qt5Gamepad.dll)
-        file(RENAME ${CURRENT_PACKAGES_DIR}/debug/bin/Qt5Gamepad.dll ${CURRENT_PACKAGES_DIR}/bin/Qt5Gamepad.dll)
-    endif()
 endif()
 
 file(INSTALL ${CURRENT_PACKAGES_DIR}/lib
@@ -152,12 +152,7 @@ file(GLOB DEBUG_LIB_FILES "${CURRENT_PACKAGES_DIR}/lib/*d.pdb")
 if(DEBUG_LIB_FILES)
     file(REMOVE ${DEBUG_LIB_FILES})
 endif()
-if(EXISTS ${CURRENT_PACKAGES_DIR}/debug/lib/Qt5Gamepad.lib)
-    file(RENAME ${CURRENT_PACKAGES_DIR}/debug/lib/Qt5Gamepad.lib ${CURRENT_PACKAGES_DIR}/lib/Qt5Gamepad.lib)
-endif()
-if(EXISTS ${CURRENT_PACKAGES_DIR}/debug/lib/Qt5Gamepad.prl)
-    file(RENAME ${CURRENT_PACKAGES_DIR}/debug/lib/Qt5Gamepad.prl ${CURRENT_PACKAGES_DIR}/lib/Qt5Gamepad.prl)
-endif()
+
 file(GLOB BINARY_TOOLS "${CURRENT_PACKAGES_DIR}/bin/*.exe")
 file(INSTALL ${BINARY_TOOLS} DESTINATION ${CURRENT_PACKAGES_DIR}/tools/qt5)
 file(REMOVE ${BINARY_TOOLS})
@@ -174,6 +169,12 @@ foreach(file ${DEBUG_PLUGINS})
     file(RENAME ${file} "${CURRENT_PACKAGES_DIR}/debug/plugins/${rel_dir}/${file_n}")
 endforeach()
 
+# There are two files ending in *d.lib/pdb normally, so move them back
+file(RENAME "${CURRENT_PACKAGES_DIR}/debug/plugins/scenegraph/qsgd3d12backend.dll" "${CURRENT_PACKAGES_DIR}/plugins/scenegraph/qsgd3d12backend.dll")
+file(RENAME "${CURRENT_PACKAGES_DIR}/debug/plugins/scenegraph/qsgd3d12backend.pdb" "${CURRENT_PACKAGES_DIR}/plugins/scenegraph/qsgd3d12backend.pdb")
+file(RENAME "${CURRENT_PACKAGES_DIR}/debug/plugins/platforms/qdirect2d.dll" "${CURRENT_PACKAGES_DIR}/plugins/platforms/qdirect2d.dll")
+file(RENAME "${CURRENT_PACKAGES_DIR}/debug/plugins/platforms/qdirect2d.pdb" "${CURRENT_PACKAGES_DIR}/plugins/platforms/qdirect2d.pdb")
+
 if(EXISTS ${CURRENT_PACKAGES_DIR}/debug/plugins/gamepads/xinputgamepad.dll)
     file(RENAME 
         ${CURRENT_PACKAGES_DIR}/debug/plugins/gamepads/xinputgamepad.dll
@@ -185,11 +186,29 @@ if(EXISTS ${CURRENT_PACKAGES_DIR}/debug/plugins/gamepads/xinputgamepad.pdb)
         ${CURRENT_PACKAGES_DIR}/plugins/gamepads/xinputgamepad.pdb)
 endif()
 
-if(NOT EXISTS ${CURRENT_PACKAGES_DIR}/lib/Qt5Bootstrap.lib AND EXISTS ${CURRENT_PACKAGES_DIR}/debug/lib/Qt5Bootstrapd.lib)
+if(EXISTS ${CURRENT_PACKAGES_DIR}/debug/bin/Qt5Gamepad.dll)
+    file(RENAME ${CURRENT_PACKAGES_DIR}/debug/bin/Qt5Gamepad.dll ${CURRENT_PACKAGES_DIR}/bin/Qt5Gamepad.dll)
+endif()
+if(EXISTS ${CURRENT_PACKAGES_DIR}/debug/lib/Qt5Gamepad.lib)
+    file(RENAME ${CURRENT_PACKAGES_DIR}/debug/lib/Qt5Gamepad.lib ${CURRENT_PACKAGES_DIR}/lib/Qt5Gamepad.lib)
+endif()
+if(EXISTS ${CURRENT_PACKAGES_DIR}/debug/lib/Qt5Gamepad.prl)
+    file(RENAME ${CURRENT_PACKAGES_DIR}/debug/lib/Qt5Gamepad.prl ${CURRENT_PACKAGES_DIR}/lib/Qt5Gamepad.prl)
+endif()
+
+if(EXISTS ${CURRENT_PACKAGES_DIR}/lib/Qt5Bootstrap.lib AND NOT EXISTS ${CURRENT_PACKAGES_DIR}/debug/lib/Qt5Bootstrapd.lib)
     # QT bug: https://bugreports.qt.io/browse/QTBUG-55499
     # The release copy of Qt5Bootstrap.lib is not created when using -debug-and-release
     # Comments from Oswald Buddenhagen indicate this is an internal library, so simply removing the mismatch should be safe.
-    file(REMOVE ${CURRENT_PACKAGES_DIR}/debug/lib/Qt5Bootstrapd.lib)
+    file(REMOVE ${CURRENT_PACKAGES_DIR}/lib/Qt5Bootstrap.lib)
+    file(REMOVE ${CURRENT_PACKAGES_DIR}/lib/Qt5Bootstrap.pdb)
+    file(REMOVE ${CURRENT_PACKAGES_DIR}/lib/Qt5Bootstrap.prl)
+endif()
+
+if(EXISTS ${CURRENT_PACKAGES_DIR}/lib/Qt5QmlDevTools.lib AND NOT EXISTS ${CURRENT_PACKAGES_DIR}/debug/lib/Qt5QmlDevTools.lib)
+    file(REMOVE ${CURRENT_PACKAGES_DIR}/lib/Qt5QmlDevTools.lib)
+    file(REMOVE ${CURRENT_PACKAGES_DIR}/lib/Qt5QmlDevTools.pdb)
+    file(REMOVE ${CURRENT_PACKAGES_DIR}/lib/Qt5QmlDevTools.prl)
 endif()
 
 vcpkg_copy_tool_dependencies(${CURRENT_PACKAGES_DIR}/tools/qt5)
